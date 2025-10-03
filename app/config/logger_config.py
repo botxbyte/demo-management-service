@@ -178,7 +178,7 @@ class QueueLogHandler:
                             durable=True,
                             arguments={"x-max-priority": 10}
                         )
-                    except (aio_pika.exceptions.AMQPException, ConnectionError, OSError) as e:
+                    except (aio_pika.exceptions.AMQPException, ConnectionError) as e:
                         print(f"Failed to connect to RabbitMQ: {e}", file=sys.stderr)
                         raise
     
@@ -257,7 +257,7 @@ class QueueLogHandler:
                 ),
                 routing_key="log_queue"
             )
-        except (aio_pika.exceptions.AMQPException, ConnectionError, OSError) as e:
+        except (aio_pika.exceptions.AMQPException, ConnectionError) as e:
             print(f"Failed to send to queue: {e}", file=sys.stderr)
     
     async def close(self):

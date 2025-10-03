@@ -102,7 +102,7 @@ async def list_workspaces(
             for f in params.filters:
                 try:
                     parsed_filters.append(json.loads(f))
-                except (json.JSONDecodeError, TypeError, ValueError):
+                except (json.JSONDecodeError, TypeError):
                     pass
         
         result = await DemoService(db).list_all(

@@ -1,4 +1,4 @@
-from typing import Iterator
+from typing import Iterator, AsyncGenerator
 from collections.abc import Generator
 from sqlalchemy.orm import sessionmaker as orm_sessionmaker
 from sqlalchemy import create_engine
@@ -41,7 +41,7 @@ def get_db() -> Iterator:
         db.close()
 
 
-async def get_async_db() -> Generator:
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """Yield an AsyncSession for use in async endpoints/dependencies.
     
     Uses read replica if USE_READ_REPLICA config is True, otherwise uses primary database.

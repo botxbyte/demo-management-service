@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
-from pydantic import BaseModel, root_validator
+from pydantic import BaseModel, model_validator
 
 # ------------------------------
 # Base Entity Schema
@@ -13,8 +13,9 @@ class BaseAppSchema(BaseModel):
 
     model_config = dict(populate_by_name=True, extra="forbid")
 
-    @root_validator(pre=True)
-    def strip_strings(self, values: Any) -> Any:
+    @model_validator(mode='before')
+    @classmethod
+    def strip_strings(cls, values: Any) -> Any:
         """Strip whitespace from all string fields."""
         # If values is not a dict (e.g., SQLAlchemy object), return as-is
         if not isinstance(values, dict):

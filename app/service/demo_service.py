@@ -14,12 +14,7 @@ from app.schema.demo_schema import (
 )
 from app.exception.demo_exception import (
     DemoNotFoundException,
-    DemoFileUploadException,
-    DemoFileValidationException,
-    DemoFileSizeExceededException,
-    DemoUnsupportedFileTypeException,
-    DemoStorageException,
-    DemoFileNotFoundException,
+
 )
 
 from app.service.baseapp_service import BaseAppService
@@ -47,23 +42,15 @@ class DemoService(BaseAppService):
         
         # Upload logo if provided
         if logo_file:
-            try:
-                logo_url = await self.file_helper.upload_logo(file=logo_file, demo_id=str(demo.demo_id))
-                # Update demo with logo URL
-                updated_demo = await self.demo_repo.update(
-                    demo_id=demo.demo_id, 
-                    demo_data={"logo": logo_url}, 
-                    user_id=user_id
-                )
-                if updated_demo:
-                    demo = updated_demo
-            except (DemoFileUploadException, DemoFileValidationException, DemoFileSizeExceededException, 
-                    DemoUnsupportedFileTypeException, DemoStorageException) as e:
-                log_central(
-                    message=f"{LogMessages.LOGO_UPLOAD_FAILED} {demo.demo_id}: {str(e)}", 
-                    level="warning"
-                )
-                # Continue without logo if upload fails
+            logo_url = await self.file_helper.upload_logo(file=logo_file, demo_id=str(demo.demo_id))
+            # Update demo with logo URL
+            updated_demo = await self.demo_repo.update(
+                demo_id=demo.demo_id, 
+                demo_data={"logo": logo_url}, 
+                user_id=user_id
+            )
+            if updated_demo:
+                demo = updated_demo
         
         return DemoReadSchema.model_validate(demo)
 
@@ -105,32 +92,16 @@ class DemoService(BaseAppService):
         
         # Handle logo upload if provided
         if logo_file:
-            try:
-                # Delete old logo if exists
-                if existing_demo.logo:
-                    try:
-                        await self.file_helper.delete_logo(existing_demo.logo)
-                    except DemoFileNotFoundException:
-                        # Old logo file doesn't exist, continue
-                        log_central(
-                            message=f"{LogMessages.OLD_LOGO_NOT_FOUND} {demo_id}, continuing with upload",  
-                            level="info"
-                        )
-                
-                # Upload new logo
-                logo_url = await self.file_helper.upload_logo(file=logo_file, demo_id=str(demo_id))
-                
-                # Add logo URL to payload
-                payload_dict = payload.model_dump(exclude_unset=True)
-                payload_dict["logo"] = logo_url
-            except (DemoFileUploadException, DemoFileValidationException, DemoFileSizeExceededException, 
-                    DemoUnsupportedFileTypeException, DemoStorageException) as e:
-                log_central(
-                    message=f"{LogMessages.LOGO_UPLOAD_FAILED} {demo_id}: {str(e)}",  
-                    level="warning"
-                )
-                # Continue without logo if upload fails
-                payload_dict = payload.model_dump(exclude_unset=True)
+            # Delete old logo if exists
+            if existing_demo.logo:
+                await self.file_helper.delete_logo(existing_demo.logo)
+            
+            # Upload new logo
+            logo_url = await self.file_helper.upload_logo(file=logo_file, demo_id=str(demo_id))
+            
+            # Add logo URL to payload
+            payload_dict = payload.model_dump(exclude_unset=True)
+            payload_dict["logo"] = logo_url
         else:
             payload_dict = payload.model_dump(exclude_unset=True)
         
