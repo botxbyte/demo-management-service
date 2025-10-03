@@ -1,0 +1,8 @@
+[MESSAGES CONTROL]
+
+disable=trailing-whitespace,missing-module-docstring,missing-final-newline
+ 
+[MASTER]
+
+load-plugins=model_rules_checker
+ 
