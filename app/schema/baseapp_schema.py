@@ -11,7 +11,7 @@ from pydantic import BaseModel, model_validator
 class BaseAppSchema(BaseModel):
     """Base schema with common functionality that can be reused by all entities."""
 
-    model_config = dict(populate_by_name=True, extra="forbid")
+    model_config = {"populate_by_name": True, "extra": "forbid"}
 
     @model_validator(mode='before')
     @classmethod

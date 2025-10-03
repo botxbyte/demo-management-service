@@ -5,7 +5,7 @@ from fastapi import Header, HTTPException,status
 from app.schema.response_schema import ListParamsSchema
 
 
-async def get_user_id(user_id: Annotated[str, Header(alias="user-id")]) -> UUID:
+def get_user_id(user_id: Annotated[str, Header(alias="user-id")]) -> UUID:
     """Get user ID from 'user-id' header with UUID validation."""
     if not user_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="user-id header missing")
@@ -20,7 +20,7 @@ async def get_user_id(user_id: Annotated[str, Header(alias="user-id")]) -> UUID:
             detail=f"Invalid user-id format. Expected UUID, got: '{user_id}'. Example: 550e8400-e29b-41d4-a716-446655440000"
         ) from ValueError
 
-async def get_workspace_id(workspace_id: Annotated[str, Header(alias="workspace-id")]) -> UUID:
+def get_workspace_id(workspace_id: Annotated[str, Header(alias="workspace-id")]) -> UUID:
     """Get workspace ID from 'workspace-id' header with UUID validation."""
     if not workspace_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="workspace-id header missing")
@@ -36,7 +36,7 @@ async def get_workspace_id(workspace_id: Annotated[str, Header(alias="workspace-
         ) from ValueError
 
 
-async def get_list_params(
+def get_list_params(
     offset: int = 0,
     limit: int = 100,
     order_by: str = "-created_at",

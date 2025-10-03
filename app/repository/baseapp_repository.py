@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta, date
-from uuid import UUID
 from sqlalchemy import select, asc, desc, func, or_, and_, not_
-from math import ceil
 from typing import Optional, Dict, List, Any, Type, Generic, TypeVar
+from uuid import UUID
+from math import ceil
+from datetime import datetime, timedelta, date
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.logger_config import configure_logging
 from app.config.constants import DatabaseErrorMessages
@@ -304,15 +304,12 @@ class BaseAppRepository(Generic[ModelType]):
                     clause = clause_part if clause is None else or_(clause, clause_part)
 
             if clause is not None:
-                if logical == "and":
-                    where_clauses.append(clause)
-                    count_clauses.append(clause)
-                elif logical == "or":
-                    where_clauses.append(clause)
-                    count_clauses.append(clause)
-                elif logical == "not":
+                if logical == "not":
                     where_clauses.append(not_(clause))
                     count_clauses.append(not_(clause))
+                else:  # "and" and "or" cases are identical
+                    where_clauses.append(clause)
+                    count_clauses.append(clause)
 
         # --- Handle search ---
         if search:

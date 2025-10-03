@@ -94,3 +94,10 @@ class SuccessMessages:
     DEMOS_RETRIEVED: Final[str] = "Demos retrieved successfully"
     DEMO_STATUS_UPDATED: Final[str] = "Demo status updated successfully"
     DEMO_ACTIVE_STATUS_UPDATED: Final[str] = "Demo active status updated successfully"
+
+
+class SchemaDescriptions:
+    """Constants for schema field descriptions."""
+    
+    # Demo schema descriptions
+    DEMO_STATUS_DESCRIPTION: Final[str] = "Demo status"

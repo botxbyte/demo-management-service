@@ -8,6 +8,7 @@ from pydantic import Field, ConfigDict
 from app.schema.baseapp_schema import (
     BaseAppSchema
 )
+from app.config.constants import SchemaDescriptions
 
 
 class DemoStatus(str, Enum):
@@ -22,7 +23,7 @@ class DemoStatus(str, Enum):
 class StatusSchema(BaseAppSchema):
     """Represents the current status of an entity."""
 
-    status: DemoStatus = Field(..., description="Demo status")
+    status: DemoStatus = Field(..., description=SchemaDescriptions.DEMO_STATUS_DESCRIPTION)
     is_active: bool = True
 
 
@@ -43,7 +44,7 @@ class DemoUpdateSchema(BaseAppSchema):
 class DemoStatusUpdateSchema(BaseAppSchema):
     """Schema for updating demo status and error messages."""
 
-    status: DemoStatus = Field(..., description="Demo status")
+    status: DemoStatus = Field(..., description=SchemaDescriptions.DEMO_STATUS_DESCRIPTION)
     error_message: Optional[str] = Field(default=None, description="Technical error message for debugging")
     error_user_message: Optional[str] = Field(default=None, description="User-friendly error message for display")
 
@@ -84,7 +85,7 @@ class DemoReadSchema(BaseAppSchema):
     updated_at: Optional[datetime] = None
     deleted_at: Optional[datetime] = None
     deleted_by: Optional[UUID] = None
-    status: DemoStatus = Field(..., description="Demo status")
+    status: DemoStatus = Field(..., description=SchemaDescriptions.DEMO_STATUS_DESCRIPTION)
     is_active: bool = True
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True, extra="forbid")

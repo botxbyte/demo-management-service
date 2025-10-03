@@ -1,7 +1,7 @@
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from typing import Optional, Dict, List, Any
+from sqlalchemy.exc import  SQLAlchemyError
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from app.model.demo_model import DemoModel
 from app.repository.baseapp_repository import BaseAppRepository
 from app.config.logger_config import logger
@@ -30,7 +30,7 @@ class DemoRepository(BaseAppRepository[DemoModel]):
             await self.db.refresh(demo)
             
             return demo
-        except (IntegrityError, SQLAlchemyError) as e:
+        except SQLAlchemyError as e:
             raise InternalServerErrorException(message=f"{DatabaseErrorMessages.DEMO_CREATION_ERROR}: {str(e)}") from e
 
     async def get_by_id(self, demo_id: UUID) -> DemoModel:
@@ -119,7 +119,7 @@ class DemoRepository(BaseAppRepository[DemoModel]):
                 raise DemoNotFoundException(demo_id=demo_id)
 
             # mark as deleted (soft delete)
-            demo.deleted_at = datetime.utcnow()
+            demo.deleted_at = datetime.now(timezone.utc)
             demo.deleted_by = user_id
             demo.status = "deleted"
             demo.is_active = False
