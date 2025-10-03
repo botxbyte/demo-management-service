@@ -1,11 +1,11 @@
 from typing import Optional, Dict, List, Any
 from sqlalchemy.exc import  SQLAlchemyError
 from uuid import UUID
+from app.config.constants import DatabaseErrorMessages
 from datetime import datetime, timezone
 from app.model.demo_model import DemoModel
 from app.repository.baseapp_repository import BaseAppRepository
-from app.config.logger_config import logger
-from app.config.constants import DatabaseErrorMessages, LogMessages
+
 from app.exception.demo_exception import (
     DemoNotFoundException
 )
@@ -52,10 +52,6 @@ class DemoRepository(BaseAppRepository[DemoModel]):
             if not demo:
                 raise DemoNotFoundException(demo_id=demo_id)
             
-            # Check if current status is not 'deleted' - if it's deleted, don't allow update
-            if demo.status == "deleted":
-                logger.warning(LogMessages.CANNOT_UPDATE_DELETED_DEMO, extra={"component": "repository", "demo_id": str(demo_id)})
-                raise DemoNotFoundException(demo_id=demo_id)
 
             for key, value in demo_data.items():
                 setattr(demo, key, value)
@@ -77,12 +73,7 @@ class DemoRepository(BaseAppRepository[DemoModel]):
             demo = await self.get_by_id(demo_id)
             if not demo:
                 raise DemoNotFoundException(demo_id=demo_id)
-
-            # Check if current status is not 'deleted' - if it's deleted, don't allow status update
-            if demo.status == "deleted":
-                logger.warning(LogMessages.CANNOT_UPDATE_STATUS_DELETED_DEMO, extra={"component": "repository", "demo_id": str(demo_id)})
-                raise DemoNotFoundException(demo_id=demo_id)
-            
+  
             demo.status = status
             if user_id is not None:
                 demo.updated_by = user_id
@@ -118,7 +109,7 @@ class DemoRepository(BaseAppRepository[DemoModel]):
             if not demo:
                 raise DemoNotFoundException(demo_id=demo_id)
 
-            # mark as deleted (soft delete)
+            # mark as deleted (soft delete) 
             demo.deleted_at = datetime.now(timezone.utc)
             demo.deleted_by = user_id
             demo.status = "deleted"

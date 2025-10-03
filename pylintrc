@@ -4,5 +4,9 @@ disable=trailing-whitespace,missing-module-docstring,missing-final-newline
  
 [MASTER]
 
-load-plugins=model_rules_checker
+init-hook="import sys; sys.path.append('.')"
+load-plugins=pylint_plugins.model_rules_checker,pylint_plugins.exception_rules_checker,pylint_plugins.schema_rules_checker,pylint_plugins.repository_rules_checker
+ 
+
+
  
