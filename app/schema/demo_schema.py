@@ -1,5 +1,4 @@
 from __future__ import annotations
-from re import T
 from typing import Optional, List
 from uuid import UUID
 from enum import Enum

@@ -69,7 +69,7 @@ class DemoService(BaseAppService):
         skip: int = 0,
         limit: int = 20,
         user_id: Optional[UUID] = None,
-    ) -> List[DemoReadSchema]:
+    ) -> Dict[str, Any]:
         """List all demos."""
         
         result = await self.demo_repo.get_all(
@@ -80,8 +80,17 @@ class DemoService(BaseAppService):
             limit=limit,
             user_id=user_id,
         )
-        data = result.get("data", []) if isinstance(result, dict) else result
-        return [DemoReadSchema.model_validate(ws) for ws in data]
+        
+        # Convert data to schema objects while preserving pagination structure
+        if isinstance(result, dict):
+            data = result.get("data", [])
+            pagination = result.get("pagination", {})
+            schema_data = [DemoReadSchema.model_validate(ws) for ws in data]
+            return {"data": schema_data, "pagination": pagination}
+        else:
+            # Fallback for non-dict results
+            schema_data = [DemoReadSchema.model_validate(ws) for ws in result]
+            return {"data": schema_data, "pagination": {}}
 
     
     async def update(self, demo_id: UUID, payload: DemoUpdateSchema, user_id: UUID, logo_file=None) -> DemoReadSchema:
