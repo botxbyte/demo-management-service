@@ -114,16 +114,13 @@ async def list_workspaces(
             user_id=user_id
         )
         
-        # Extract data and pagination info
-        if isinstance(result, dict):
-            data = result.get("data", [])
-            total_count = result.get("total_count", len(data))
-        else:
-            data = result
-            total_count = len(data)
+        # Extract data and pagination info from service result
+        data = result.get("data", [])
+        pagination_data = result.get("pagination", {})
         
-        # Calculate pagination metadata
-        total_pages = (total_count + params.limit - 1) // params.limit if total_count > 0 else 0
+        # Use pagination data from service, with fallback calculations
+        total_count = pagination_data.get("total_count", len(data))
+        total_pages = pagination_data.get("total_pages", (total_count + params.limit - 1) // params.limit if total_count > 0 else 0)
         
         pagination = PaginationMeta(
             total_count=total_count,

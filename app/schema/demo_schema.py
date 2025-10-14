@@ -31,13 +31,13 @@ class DemoCreateSchema(BaseAppSchema):
     """Schema for creating a new demo."""
 
     name: str = Field(..., min_length=1, max_length=200)
-    logo: Optional[str] = None  # Will be set after file upload
+    logo: Optional[str] = Field(default=None, description="Logo image file")  # Will be set after file upload
 
 class DemoUpdateSchema(BaseAppSchema):
     """Schema for updating an existing demo."""
 
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
-    logo: Optional[str] = None  # Will be set after file upload
+    logo: Optional[str] = Field(default=None, description="Logo image file")  # Will be set after file upload
 
 
 
@@ -53,7 +53,7 @@ class DemoStatusUpdateSchema(BaseAppSchema):
 class DemoIsActiveUpdateSchema(BaseAppSchema):
     """Schema for updating demo is_active status."""
 
-    is_active: bool = Field(..., description="Whether the demo is active")
+    is_active: bool = Field(default=True, description="Whether the demo is active")
 
 
 class DemoListParamsSchema(BaseAppSchema):
@@ -76,16 +76,16 @@ class DemoListParamsSchema(BaseAppSchema):
 class DemoReadSchema(BaseAppSchema):
     """Schema for reading demo details."""
 
-    demo_id: UUID
-    name: str
-    logo: Optional[str] = None
+    demo_id: UUID = Field(..., description="Demo ID")
+    name: str = Field(..., description="Demo name")
+    logo: Optional[str] = Field(default=None, description="Logo image file")
     
     # Include fields from other schemas directly
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    deleted_at: Optional[datetime] = None
-    deleted_by: Optional[UUID] = None
+    created_at: datetime = Field(..., description="Created at")
+    updated_at: Optional[datetime] = Field(default=None, description="Updated at")
+    deleted_at: Optional[datetime] = Field(default=None, description="Deleted at")
+    deleted_by: Optional[UUID] = Field(default=None, description="Deleted by")
     status: DemoStatus = Field(..., description=SchemaDescriptions.DEMO_STATUS_DESCRIPTION)
-    is_active: bool = True
+    is_active: bool = Field(default=True, description="Whether the demo is active")
 
     model_config = ConfigDict(from_attributes=True, populate_by_name=True, extra="forbid")

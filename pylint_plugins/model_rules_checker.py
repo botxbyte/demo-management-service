@@ -39,11 +39,6 @@ class ModelRulesChecker(BaseChecker):
             "status-field-rules",
             "Status fields must be String(20) with default='created'.",
         ),
-        "E9916": (
-            "Array field '%s' must be ARRAY with default=[] and column name ending with '_list_id'",
-            "array-field-rules",
-            "Array fields must use ARRAY, have default=[], and end with '_list_id'.",
-        ),
         "E9917": (
             "DateTime column '%s' must use timezone=True",
             "datetime-timezone-required",
@@ -152,10 +147,6 @@ class ModelRulesChecker(BaseChecker):
             if not ("String(20)" in col_args and col_kwargs.get("default") == "'created'"):
                 self.add_message("status-field-rules", node=node, args=(col_name,))
  
-        # ---- Array Rule ----
-        if any("ARRAY" in arg for arg in col_args):
-            if not col_name.endswith("_list_id") or col_kwargs.get("default") != "[]":
-                self.add_message("array-field-rules", node=node, args=(col_name,))
  
         # ---- DateTime Rule ----
         if col_args and "DateTime" in col_args[0]:

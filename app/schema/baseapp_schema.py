@@ -5,9 +5,7 @@ from typing import Any, Optional
 from uuid import UUID
 from pydantic import BaseModel, model_validator
 
-# ------------------------------
-# Base Entity Schema
-# ------------------------------
+
 class BaseAppSchema(BaseModel):
     """Base schema with common functionality that can be reused by all entities."""
 
@@ -26,9 +24,7 @@ class BaseAppSchema(BaseModel):
                 values[field] = value.strip()
         return values
 
-# ------------------------------
-# Core Reusable Schemas
-# ------------------------------
+
 class TimestampSchema(BaseModel):
     """Tracks when a record was created and last updated."""
 
