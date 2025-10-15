@@ -1,6 +1,7 @@
+import json
 from uuid import UUID
-from typing import Annotated, Optional, List
-from fastapi import Header, HTTPException,status
+from typing import Annotated, Optional
+from fastapi import Header, HTTPException, status
 
 from app.schema.response_schema import ListParamsSchema
 
@@ -41,16 +42,33 @@ def get_list_params(
     limit: int = 100,
     order_by: str = "-created_at",
     search: Optional[str] = None,
-    filters: Optional[List[str]] = None,
+    filters: Optional[str] = None,
 ) -> ListParamsSchema:
     """
     Generalized function to handle list parameters for any API endpoint.
     """
+    # Parse filters if provided as a JSON string
+    parsed_filters = None
+    if filters:
+        try:
+            # Parse the JSON string completely into actual objects
+            data = json.loads(filters)
+            # Handle new structure: {"Filters": [...], "logic": "..."}
+            if isinstance(data, dict) and "Filters" in data:
+                parsed_filters = data # Pass the whole object
+            # Handle old structure: a list of filters
+            elif isinstance(data, list):
+                parsed_filters = {"Filters": data, "logic": "AND"} # Wrap in new structure
+            else:
+                parsed_filters = None
+        except (json.JSONDecodeError, TypeError):
+            parsed_filters = None
+    
     # Create and return the parameters as an instance of the schema
     return ListParamsSchema(
         offset=offset,
         limit=limit,
         order_by=order_by,
         search=search,
-        filters=filters
+        filters=parsed_filters
     )

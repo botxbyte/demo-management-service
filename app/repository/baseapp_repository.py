@@ -1,8 +1,8 @@
-from sqlalchemy import select, asc, desc, func, or_, and_, not_
-from typing import Optional, Dict, List, Any, Type, Generic, TypeVar
 from uuid import UUID
-from math import ceil
 from datetime import datetime, timedelta, date
+from typing import Optional, Dict, List, Any, Type, Generic, TypeVar
+from math import ceil
+from sqlalchemy import select, asc, desc, func, or_, and_, not_, cast, Date, DateTime
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config.logger_config import configure_logging
 from app.config.constants import DatabaseErrorMessages
@@ -44,7 +44,7 @@ OPERATOR_MAPPING = {
     "previous_day": "previous_day",
     "previous_7_days": "previous_7_days",
     "previous_30_days": "previous_30_days",
-    "previous_month": "previous_month",
+    "previous_1_month": "previous_1_month",
     "previous_3_months": "previous_3_months",
     "previous_12_months": "previous_12_months",
     "before": "before",
@@ -69,6 +69,45 @@ def map_frontend_operator(operator: str) -> str:
     return OPERATOR_MAPPING.get(operator, operator)
 
 
+def parse_date_value(value: Any) -> Optional[datetime]:
+    """
+    Parse various date formats to datetime object.
+    Handles: datetime objects, date objects, ISO strings, timestamps
+    """
+    if value is None:
+        return None
+    
+    if isinstance(value, datetime):
+        return value
+    
+    if isinstance(value, date):
+        return datetime.combine(value, datetime.min.time())
+    
+    if isinstance(value, str):
+        try:
+            # Try ISO format first
+            return datetime.fromisoformat(value.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            try:
+                # Try common date formats
+                for fmt in ['%Y-%m-%d', '%Y-%m-%d %H:%M:%S', '%Y/%m/%d', '%d-%m-%Y']:
+                    try:
+                        return datetime.strptime(value, fmt)
+                    except ValueError:
+                        continue
+            except:
+                pass
+    
+    if isinstance(value, (int, float)):
+        try:
+            # Assume timestamp
+            return datetime.fromtimestamp(value)
+        except:
+            pass
+    
+    return None
+
+
 class BaseAppRepository(Generic[ModelType]):
     """Base repository class that can be reused by all repositories."""
 
@@ -89,24 +128,50 @@ class BaseAppRepository(Generic[ModelType]):
         """
         Get all records with dynamic filters + search + ordering + pagination.
         """
-        filters = filters or []
+        # filters = filters or []
         query = select(self.model)
-        count_query = select(func.count()).select_from(self.model)
+        # Get primary key column for counting
+        primary_key_col = None
+        for col_name in dir(self.model):
+            if not col_name.startswith('_'):
+                col_attr = getattr(self.model, col_name)
+                if hasattr(col_attr, 'primary_key') and col_attr.primary_key:
+                    primary_key_col = col_attr
+                    break
+        
+        if primary_key_col:
+            count_query = select(func.count(primary_key_col))
+        else:
+            count_query = select(func.count()).select_from(self.model)
 
         where_clauses = []
         count_clauses = []
 
         # --- Handle dynamic filters ---
-        for f in filters:
-            col_name = f.get("column_name")
+        filter_rules = []
+        overall_logic = "AND"
+
+        if isinstance(filters, dict):
+            filter_rules = filters.get("Filters", [])
+            overall_logic = filters.get("logic", "AND")
+        elif isinstance(filters, list): # Fallback for old format
+            filter_rules = filters
+
+        for f in filter_rules:
+            col_name = f.get("column")
             operator = map_frontend_operator(f.get("operator"))  # Map frontend operator to backend
             value = f.get("value")
             logical = f.get("logical", "and")
-            case_sensitive = f.get("case_sensitive", False)
+            case_sensitive = f.get("caseSensitive", False)
             columns = f.get("columns", [col_name]) if col_name == "search" else [col_name]
+            value2 = f.get("value2")
 
             clause = None
             for col in columns:
+                # Add a guard clause to prevent processing if the column name is None
+                if col is None:
+                    continue
+
                 if not hasattr(self.model, col):
                     continue
                 column_attr = getattr(self.model, col)
@@ -128,7 +193,7 @@ class BaseAppRepository(Generic[ModelType]):
                     elif operator == "lte":
                         clause_part = column_attr <= value
                     elif operator == "between":
-                        clause_part = column_attr.between(value[0], value[1])
+                        clause_part = column_attr.between(value, value2)
                     elif operator == "is_empty":
                         clause_part = column_attr.is_(None)
                     elif operator == "not_empty":
@@ -144,15 +209,15 @@ class BaseAppRepository(Generic[ModelType]):
                     elif operator == "is_not":
                         clause_part = cmp_func != cmp_value
                     elif operator == "as_it":  # Case-insensitive equality
-                        clause_part = func.lower(column_attr) == str(value).lower()
+                        clause_part = func.lower(column_attr) == cmp_value
                     elif operator == "contains":
-                        clause_part = cmp_func.ilike(f"%{cmp_value}%") if not case_sensitive else cmp_func.like(f"%{cmp_value}%")
+                        clause_part = column_attr.ilike(f"%{value}%") if not case_sensitive else column_attr.like(f"%{value}%")
                     elif operator == "not_contains":
-                        clause_part = ~cmp_func.ilike(f"%{cmp_value}%") if not case_sensitive else ~cmp_func.like(f"%{cmp_value}%")
+                        clause_part = ~column_attr.ilike(f"%{value}%") if not case_sensitive else ~column_attr.like(f"%{value}%")
                     elif operator == "startswith":
-                        clause_part = cmp_func.ilike(f"{cmp_value}%") if not case_sensitive else cmp_func.like(f"{cmp_value}%")
+                        clause_part = column_attr.ilike(f"{value}%") if not case_sensitive else column_attr.like(f"{value}%")
                     elif operator == "endswith":
-                        clause_part = cmp_func.ilike(f"%{cmp_value}") if not case_sensitive else cmp_func.like(f"%{cmp_value}")
+                        clause_part = column_attr.ilike(f"%{value}") if not case_sensitive else column_attr.like(f"%{value}")
                     elif operator == "is_empty":
                         clause_part = column_attr.is_(None)
                     elif operator == "not_empty":
@@ -160,10 +225,20 @@ class BaseAppRepository(Generic[ModelType]):
 
                 # --- Boolean filters ---
                 elif "bool" in col_type:
+                    # Convert string 'true'/'false' to Python boolean
+                    bool_value = None
+                    if isinstance(value, str):
+                        if value.lower() == 'true':
+                            bool_value = True
+                        elif value.lower() == 'false':
+                            bool_value = False
+                    elif isinstance(value, bool):
+                        bool_value = value
+
                     if operator == "is":
-                        clause_part = column_attr.is_(value)
+                        clause_part = column_attr.is_(bool_value)
                     elif operator == "is_not":
-                        clause_part = column_attr.isnot(value)
+                        clause_part = column_attr.isnot(bool_value)
                     elif operator == "is_empty":
                         clause_part = column_attr.is_(None)
                     elif operator == "not_empty":
@@ -196,7 +271,7 @@ class BaseAppRepository(Generic[ModelType]):
                         clause_part = column_attr >= today - timedelta(days=7)
                     elif operator == "prev_30_days" or operator == "previous_30_days":
                         clause_part = column_attr >= today - timedelta(days=30)
-                    elif operator == "previous_month":
+                    elif operator == "previous_1_month":
                         # First day of previous month
                         first_day_prev_month = today.replace(day=1) - timedelta(days=1)
                         first_day_prev_month = first_day_prev_month.replace(day=1)
@@ -208,13 +283,29 @@ class BaseAppRepository(Generic[ModelType]):
                     elif operator == "previous_12_months":
                         clause_part = column_attr >= today - timedelta(days=365)
                     elif operator == "between":
-                        clause_part = column_attr.between(value[0], value[1])
+                        # CRITICAL FIX: Parse date values properly
+                        if isinstance(value, (list, tuple)) and len(value) >= 2:
+                            start_date = parse_date_value(value[0])
+                            end_date = parse_date_value(value[1])
+                            
+                            if start_date and end_date:
+                                # Use proper date casting based on column type
+                                if "timestamp" in col_type:
+                                    clause_part = column_attr.between(start_date, end_date)
+                                else:  # date type
+                                    clause_part = column_attr.between(start_date.date(), end_date.date())
                     elif operator == "before":
-                        clause_part = column_attr < value
+                        parsed_value = parse_date_value(value)
+                        if parsed_value:
+                            clause_part = column_attr < parsed_value
                     elif operator == "after":
-                        clause_part = column_attr > value
+                        parsed_value = parse_date_value(value)
+                        if parsed_value:
+                            clause_part = column_attr > parsed_value
                     elif operator == "on":
-                        clause_part = func.date(column_attr) == value
+                        parsed_value = parse_date_value(value)
+                        if parsed_value:
+                            clause_part = func.date(column_attr) == parsed_value.date()
                     
                     # Time operators
                     elif operator == "this_hour":
@@ -252,23 +343,59 @@ class BaseAppRepository(Generic[ModelType]):
                     # Relative range operators (enhanced)
                     elif operator == "previous":
                         # Handle relative date range from value
-                        if isinstance(value, dict) and "relativeDateRange" in value:
-                            rel_range = value["relativeDateRange"]
+                        rel_range = f.get("relativeDateRange")
+                        if rel_range:
                             period_type = rel_range.get("periodType", "day")
                             count = rel_range.get("count", 1)
+                            include_today = rel_range.get("includeToday", False)
+                            
+                            # Calculate start date based on include_today flag
+                            if include_today:
+                                start_date = today - timedelta(days=count - 1) if period_type == "day" else today
+                            else:
+                                start_date = today - timedelta(days=1)  # Start from yesterday
                             
                             if period_type == "day":
-                                clause_part = column_attr >= today - timedelta(days=count)
+                                if include_today:
+                                    # Include today: from (today - count + 1) to today
+                                    clause_part = column_attr >= datetime.combine(today - timedelta(days=count - 1), datetime.min.time())
+                                else:
+                                    # Exclude today: from (today - count) to yesterday
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today - timedelta(days=count), datetime.min.time()),
+                                        column_attr < datetime.combine(today, datetime.min.time())
+                                    )
                             elif period_type == "week":
-                                clause_part = column_attr >= today - timedelta(weeks=count)
+                                weeks_in_days = count * 7
+                                if include_today:
+                                    clause_part = column_attr >= datetime.combine(today - timedelta(days=weeks_in_days - 1), datetime.min.time())
+                                else:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today - timedelta(days=weeks_in_days), datetime.min.time()),
+                                        column_attr < datetime.combine(today, datetime.min.time())
+                                    )
                             elif period_type == "month":
-                                clause_part = column_attr >= today - timedelta(days=count * 30)
+                                months_in_days = count * 30
+                                if include_today:
+                                    clause_part = column_attr >= datetime.combine(today - timedelta(days=months_in_days - 1), datetime.min.time())
+                                else:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today - timedelta(days=months_in_days), datetime.min.time()),
+                                        column_attr < datetime.combine(today, datetime.min.time())
+                                    )
                             elif period_type == "year":
-                                clause_part = column_attr >= today - timedelta(days=count * 365)
+                                years_in_days = count * 365
+                                if include_today:
+                                    clause_part = column_attr >= datetime.combine(today - timedelta(days=years_in_days - 1), datetime.min.time())
+                                else:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today - timedelta(days=years_in_days), datetime.min.time()),
+                                        column_attr < datetime.combine(today, datetime.min.time())
+                                    )
                     elif operator == "current":
                         # Handle current period
-                        if isinstance(value, dict) and "relativeDateRange" in value:
-                            rel_range = value["relativeDateRange"]
+                        rel_range = f.get("relativeDateRange")
+                        if rel_range:
                             period_type = rel_range.get("periodType", "day")
                             
                             if period_type == "day":
@@ -288,20 +415,59 @@ class BaseAppRepository(Generic[ModelType]):
                                 clause_part = func.date(column_attr).between(start_of_month, end_of_month)
                     elif operator == "next":
                         # Handle next period
-                        if isinstance(value, dict) and "relativeDateRange" in value:
-                            rel_range = value["relativeDateRange"]
+                        rel_range = f.get("relativeDateRange")
+                        if rel_range:
                             period_type = rel_range.get("periodType", "day")
                             count = rel_range.get("count", 1)
+                            include_today = rel_range.get("includeToday", False)
                             
                             if period_type == "day":
-                                clause_part = column_attr.between(today + timedelta(days=1), today + timedelta(days=count))
+                                if include_today:
+                                    # Include today: from today to (today + count - 1)
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today, datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=count), datetime.min.time())
+                                    )
+                                else:
+                                    # Exclude today: from tomorrow to (today + count)
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today + timedelta(days=1), datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=count + 1), datetime.min.time())
+                                    )
                             elif period_type == "week":
-                                clause_part = column_attr.between(today + timedelta(days=1), today + timedelta(weeks=count))
+                                weeks_in_days = count * 7
+                                if include_today:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today, datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=weeks_in_days), datetime.min.time())
+                                    )
+                                else:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today + timedelta(days=1), datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=weeks_in_days + 1), datetime.min.time())
+                                    )
                             elif period_type == "month":
-                                clause_part = column_attr.between(today + timedelta(days=1), today + timedelta(days=count * 30))
+                                months_in_days = count * 30
+                                if include_today:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today, datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=months_in_days), datetime.min.time())
+                                    )
+                                else:
+                                    clause_part = and_(
+                                        column_attr >= datetime.combine(today + timedelta(days=1), datetime.min.time()),
+                                        column_attr < datetime.combine(today + timedelta(days=months_in_days + 1), datetime.min.time())
+                                    )
 
                 if clause_part is not None:
-                    clause = clause_part if clause is None else or_(clause, clause_part)
+                    if clause is None:
+                        clause = clause_part
+                    else:
+                        # Use logical operator to combine clauses
+                        if logical == "or":
+                            clause = or_(clause, clause_part)
+                        else:  # default to "and"
+                            clause = and_(clause, clause_part)
 
             if clause is not None:
                 if logical == "not":
@@ -312,8 +478,8 @@ class BaseAppRepository(Generic[ModelType]):
                     count_clauses.append(clause)
 
         # --- Handle search ---
+        search_clauses = []
         if search:
-            search_clauses = []
             # Find all string columns that can be searched
             for column_name in dir(self.model):
                 if not column_name.startswith('_'):
@@ -325,18 +491,28 @@ class BaseAppRepository(Generic[ModelType]):
             
             if search_clauses:
                 search_condition = or_(*search_clauses)
-                where_clauses.append(search_condition)
-                count_clauses.append(search_condition)
+                # This will be added to the final clauses later
 
-        # --- Exclude deleted by default if status exists ---
-        if hasattr(self.model, 'status'):
-            where_clauses.append(getattr(self.model, 'status') != "deleted")
-            count_clauses.append(getattr(self.model, 'status') != "deleted")
-
-        # --- Apply WHERE ---
+        # --- Apply WHERE clauses ---
+        final_clauses = []
+        
+        # 1. Group user-defined filters from `where_clauses`
         if where_clauses:
-            query = query.where(and_(*where_clauses))
-            count_query = count_query.where(and_(*count_clauses))
+            if overall_logic.upper() == "ANY" or overall_logic.upper() == "OR":
+                final_clauses.append(or_(*where_clauses))
+            else: # Default to AND
+                final_clauses.append(and_(*where_clauses))
+
+        # 2. Add search clause (if it exists)
+        if search_clauses:
+            final_clauses.append(or_(*search_clauses))
+        # 3. Add default status filter to exclude deleted items
+        if hasattr(self.model, 'status'):
+            final_clauses.append(getattr(self.model, 'status') != "deleted")
+
+        if final_clauses:
+            query = query.where(and_(*final_clauses))
+            count_query = count_query.where(and_(*final_clauses))
 
         # --- Handle ordering ---
         if order_by:
