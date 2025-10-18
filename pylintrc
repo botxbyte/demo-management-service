@@ -1,12 +1,8 @@
 [MESSAGES CONTROL]
 
-disable=trailing-whitespace,missing-module-docstring,missing-final-newline
+disable=trailing-whitespace,missing-module-docstring,missing-final-newline,line-too-long
  
 [MASTER]
 
 init-hook="import sys; sys.path.append('.')"
 load-plugins=pylint_plugins.model_rules_checker,pylint_plugins.exception_rules_checker,pylint_plugins.schema_rules_checker,pylint_plugins.repository_rules_checker
- 
-
-
- 

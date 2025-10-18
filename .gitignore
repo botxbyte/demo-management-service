@@ -36,5 +36,5 @@ pytest_cache/
 *.py,cover
 
 # IDE / Editor settings
-.vscode/
+
 .idea/
